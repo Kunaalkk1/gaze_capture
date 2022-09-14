@@ -9,15 +9,19 @@ Following is the output that shows the blink count:
 `Blink count: 7`
 
 Following is an image of person looking in Center
+
 ![alt text](https://github.com/kunaalkk1/gaze_capture/blob/main/Center.png?raw=true)
 
+
+
+
 Following is an image of person looking in Left
+
 ![alt text](https://github.com/kunaalkk1/gaze_capture/blob/main/Left.png?raw=true)
 
+
+
+
 Following is an image of person looking in Right
+
 ![alt text](https://github.com/kunaalkk1/gaze_capture/blob/main/Right.png?raw=true)
-
-Following is the csv file generated.
-(Note: The file is quite long with a lot of values)
-
-![alt text](https://github.com/kunaalkk1/gaze_capture/blob/main/14-09-2022_12-59-30.csv)
