@@ -1,11 +1,18 @@
 # Dependencies
+from asyncore import write
 import cv2
 import dlib
 from math import hypot
 import numpy as np
+import csv
+import datetime
 
+file_name = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+file_name = file_name + ".csv"
 # Capture video stream
 cap = cv2.VideoCapture(0)
+header = ["left_eye_left_side_white", "left_eye_right_side_white", "right_eye_left_side_white", "right_eye_right_side_white", "left_ratio", "right_ratio", "eye_ratio"]
+myList = []
 
 # The dlib face detector and predictor
 detector = dlib.get_frontal_face_detector()
@@ -31,6 +38,8 @@ def blink_detector(eye_points, landmarks):
     cv2.line(frame, left_point, right_point, (0, 255, 0), 2)
     cv2.line(frame, center_top, center_bottom, (0, 255, 0), 2)
        
+    # Get lengths of both the lines and their ratio
+
     ver_line_length = hypot((center_top[0] - center_bottom[0]), (center_top[1] - center_bottom[1]))
     hor_line_length = hypot((left_point[0] - right_point[0]), (left_point[1] - right_point[1]))
     
@@ -59,7 +68,7 @@ while True:
             # To mention on the video frame that person blinked, uncomment the following line
             prev_blink_left = left_eye_ratio
             prev_blink_right = right_eye_ratio
-            cv2.putText(frame, "Blinking", (50, 150), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(frame, "Blinking", (50, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
             
             # Get blink count
             blink_count += 1
@@ -113,7 +122,23 @@ while True:
         gray_left_eye = left_eye[min_left_y: max_left_y, min_left_x: max_left_x]
         _, threshold_left_eye = cv2.threshold(gray_left_eye, 70, 255, cv2.THRESH_BINARY)
         
+        height_left, width_left = threshold_left_eye.shape
         
+        l_left_side_threshold = threshold_left_eye [0: height_left, 0:int(width_left/2)] # Left half of the eye
+        l_right_side_threshold  = threshold_left_eye[0: height_left, int(width_left/2):width_left] # Right half of the eye
+
+        l_left_side_white = cv2.countNonZero(l_left_side_threshold)
+        l_right_side_white = cv2.countNonZero(l_right_side_threshold)
+        
+        if l_left_side_white == 0 or l_right_side_white == 0:
+            left_ratio = 0
+        else:
+            left_ratio = l_left_side_white / l_right_side_white
+        
+        #  Show the thresholds of the left eye
+        cv2.putText(frame, str(l_left_side_white), (120, 150), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 2)
+        cv2.putText(frame, str(l_right_side_white), (120, 180), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 2)
+
         # Right eye ##############################################################
         right_eye_region = np.array([(landmarks.part(42).x, landmarks.part(42).y),
                                      (landmarks.part(43).x, landmarks.part(43).y),
@@ -146,11 +171,37 @@ while True:
         right_eye_copy = cv2.bitwise_and(gray, gray, mask=mask)
         gray_right_eye = right_eye[min_right_y: max_right_y, min_right_x: max_right_x]
         _, threshold_right_eye = cv2.threshold(gray_right_eye, 70, 255, cv2.THRESH_BINARY)
+        
+        height_right, width_right = threshold_right_eye.shape
+        
+        r_left_side_threshold = threshold_right_eye [0: height_right, 0:int(width_right/2)] # Left half of the eye
+        r_right_side_threshold  = threshold_right_eye[0: height_right, int(width_right/2):width_right] # Right half of the eye
+        
+        r_left_side_white = cv2.countNonZero(r_left_side_threshold)
+        r_right_side_white = cv2.countNonZero(r_right_side_threshold)
 
+        if l_left_side_white == 0 or l_right_side_white == 0:
+            right_ratio = 0
+        else:
+            right_ratio = l_left_side_white / l_right_side_white
+
+        eye_ratio = (left_ratio + right_ratio)  / 2
+        
+        if eye_ratio > 1.8:
+            cv2.putText(frame, "Left", (450, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
+        elif eye_ratio < 0.2:
+            cv2.putText(frame, "Right", (450, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
+        else:
+            cv2.putText(frame, "Center", (450, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
+
+        #  Show the thresholds of the right eye
+        cv2.putText(frame, str(r_left_side_white), (450, 150), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 2)
+        cv2.putText(frame, str(r_right_side_white), (450, 180), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 2)
+
+        ##################################################################################
         # We have got the left and right eye separately outlined #########################
 
         #  Face detection box - uncomment the next three lines to see
-
         x0, y0 = face.left(), face.top()
         x1, y1 = face.right(), face.bottom()
         cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 255, 0), 2)
@@ -160,24 +211,42 @@ while True:
 
         # Draw the right eye region
         cv2.polylines(frame, [right_eye_region], True, (0, 0, 255), 1)
+        
+        if l_left_side_white != 0 and l_right_side_white != 0 and r_left_side_white != 0 and r_right_side_white != 0 and left_ratio != 0 and right_ratio != 0 and eye_ratio != 0:
+            
+            my_dict = {"left_eye_left_side_white": l_left_side_white,
+            "left_eye_right_side_white": l_right_side_white,
+            "right_eye_left_side_white": r_left_side_white,
+            "right_eye_right_side_white": r_right_side_white,
+            "left_ratio": round(left_ratio,2),
+            "right_ratio": round(right_ratio,2),
+            "eye_ratio": round(eye_ratio,2)}
+            myList.append(my_dict)
 
 
-    # Show the frame and the mask
+
+
+    # Show the frame
     cv2.imshow("Face", frame)
+
+    # Show the mask
     # cv2.imshow("Mask", mask)
 
-    # Show left eye separately
+    # Show left eye and its attributes separately
 
-    # cv2.imshow("Left eye", left_eye)
+    cv2.imshow("Left eye", left_eye)
     cv2.imshow("Left eye outline", gray_left_eye)
     cv2.imshow("Threshold left eye", threshold_left_eye)
+    cv2.imshow("Left half of left eye", l_left_side_threshold)
+    cv2.imshow("Right half of left eye", l_right_side_threshold)
+    
+    # Show right eye and its attributes separately
 
-    # Show right eye separately
-
-    # cv2.imshow("Right eye", right_eye)
+    cv2.imshow("Right eye", right_eye)
     cv2.imshow("Right eye outline", gray_right_eye)
     cv2.imshow("Threshold right eye", threshold_right_eye)
-
+    cv2.imshow("Left half of right eye", r_left_side_threshold)
+    cv2.imshow("Right half of right eye", r_right_side_threshold)
     
     # Since mask is same for left_eye_copy and right_eye_copy, 
     # we can use it to show both eyes together by calling the variable that
@@ -191,8 +260,15 @@ while True:
         break
 
 # After breaking from loop, exit the video capture and destroy all windows
+
 cap.release()
 cv2.destroyAllWindows()
 
 # Get the blink count
-# print("Blink count: ", blink_count)
+print("Blink count: ", blink_count)
+
+with open(file_name, 'w', newline='') as f:
+    dict_writer = csv.DictWriter(f, header)
+    dict_writer.writeheader()
+    dict_writer.writerows(myList)
+
